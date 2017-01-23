@@ -26,6 +26,7 @@ namespace EltakoWindSensorApp
         private SolidColorBrush redBrush = new SolidColorBrush(Windows.UI.Colors.Red);
         private SolidColorBrush greenBrush = new SolidColorBrush(Windows.UI.Colors.Green);
         private Timer windsensorTimer;
+		private double _windspeed = -1;
         private SpiDevice _mcp3008;
         private Timer temperatureTimer;
 		private volatile int counter = 0;
@@ -94,14 +95,24 @@ namespace EltakoWindSensorApp
             {
                 WindStatus.Text = "Wind speed " + windspeed + " km/h";
             });
-
-            //var message = new Message { Name = "Wind", Value = windspeed };
-            //var httpClient = new HttpClient();
-            //httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
-            //var content = new HttpStringContent(JsonConvert.SerializeObject(message));
-            //var result = await httpClient.PostAsync(new Uri("http://192.168.178.85/api/queue/windsensor"), content);
-            //Debug.WriteLine("Status: "+result.StatusCode);
-        }
+			if (windspeed != _windspeed)
+			{
+				try
+				{
+					_windspeed = windspeed;
+					var message = new Message { Key = "Wind", Value = windspeed.ToString("F2") };
+					var httpClient = new HttpClient();
+					//httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
+					var content = new HttpStringContent(JsonConvert.SerializeObject(message), Windows.Storage.Streams.UnicodeEncoding.Utf8, "application/json");
+					var result = await httpClient.PostAsync(new Uri("http://192.168.178.85/api/queue/windsensor"), content);
+					Debug.WriteLine("http status wind sensor call: " + result.StatusCode + " " + (int)result.StatusCode);
+				}
+				catch (Exception ex)
+				{
+					Debug.WriteLine(ex.Message);
+				}
+			}
+		}
 
         private void WindsensorTriggered(GpioPin sender, GpioPinValueChangedEventArgs e)
         {
@@ -127,7 +138,7 @@ namespace EltakoWindSensorApp
                 _mcp3008 = await SpiDevice.FromIdAsync(deviceInfo[0].Id, spiSettings);
 				_temperatureAverage = new MovingAverage(10);
                 // read temperature every second
-                temperatureTimer = new Timer(TemperatureTimerCallback, null, 0, 30*1000);
+                temperatureTimer = new Timer(TemperatureTimerCallback, null, 0, 1000);
             }
             else
             {
@@ -135,7 +146,7 @@ namespace EltakoWindSensorApp
             }
         }
 
-        private void TemperatureTimerCallback(object state)
+        private async void TemperatureTimerCallback(object state)
         {
             //From data sheet -- 1 byte selector for channel 0 on the ADC
             // First Byte sends the Start bit for SPI
@@ -164,12 +175,27 @@ namespace EltakoWindSensorApp
 			_temperatureAverage.Add(tempC);
 
             var output = "The temperature is " + tempC + " Celsius\nand " + tempF + " Farenheit";
+			Debug.WriteLine(output);
             var task = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
             {
                 TemperatureStatus.Text = output;
 				AvgTemperatureStatus.Text = "Average temperature is " + _temperatureAverage.Average + " Celsius";
             });
-        }
+
+			try
+			{
+				var message = new Message { Key = "Temperature", Value = _temperatureAverage.Average.ToString("F2") };
+				var httpClient = new HttpClient();
+				//httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
+				var content = new HttpStringContent(JsonConvert.SerializeObject(message), Windows.Storage.Streams.UnicodeEncoding.Utf8, "application/json");
+				var postresult = await httpClient.PostAsync(new Uri("http://192.168.178.85/api/queue/windsensor"), content);
+				Debug.WriteLine("http status temperature sensor call: " + postresult.StatusCode + " " + (int)postresult.StatusCode);
+			}
+			catch (Exception ex)
+			{
+				Debug.WriteLine(ex.Message);
+			}
+		}
 
     }
 }
