@@ -5,7 +5,9 @@ using Newtonsoft.Json;
 using System;
 using System.Diagnostics;
 using System.Threading;
+using Windows.Devices.Enumeration;
 using Windows.Devices.Gpio;
+using Windows.Devices.Spi;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -24,16 +26,21 @@ namespace EltakoWindSensorApp
         private SolidColorBrush redBrush = new SolidColorBrush(Windows.UI.Colors.Red);
         private SolidColorBrush greenBrush = new SolidColorBrush(Windows.UI.Colors.Green);
         private Timer windsensorTimer;
+        private SpiDevice _mcp3008;
+        private Timer temperatureTimer;
+		private volatile int counter = 0;
+		private MovingAverage _temperatureAverage;
 
-        public MainPage()
+		public MainPage()
         {
             InitializeComponent();
             InitGPIO();
+            InitSpi();
         }
 
-        private volatile int counter = 0;
 
-        private void InitGPIO()
+
+		private void InitGPIO()
         {
             var gpio = GpioController.GetDefault();
 
@@ -63,15 +70,16 @@ namespace EltakoWindSensorApp
 
             // Register for the ValueChanged event so our buttonPin_ValueChanged 
             // function is called when the button is pressed
-            sensorPin.ValueChanged += windsensorTriggered;
+            sensorPin.ValueChanged += WindsensorTriggered;
 
             WindStatus.Text = "GPIO pins initialized correctly.";
 
             // calculate windspeed every second
-            windsensorTimer = new Timer(windsensorTimerCallback, null, 1000, 1000);
+            windsensorTimer = new Timer(WindsensorTimerCallbackAsync, null, 1000, 1000);
+
         }
 
-        private async void windsensorTimerCallback(object state) // this timer is called every 1000ms
+        private async void WindsensorTimerCallbackAsync(object state) // this timer is called every 1000ms
         {
             var current = counter*2; // two signals per round
             counter = 0;
@@ -86,15 +94,81 @@ namespace EltakoWindSensorApp
             {
                 WindStatus.Text = "Wind speed " + windspeed + " km/h";
             });
+
+            //var message = new Message { Name = "Wind", Value = windspeed };
+            //var httpClient = new HttpClient();
+            //httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
+            //var content = new HttpStringContent(JsonConvert.SerializeObject(message));
+            //var result = await httpClient.PostAsync(new Uri("http://192.168.178.85/api/queue/windsensor"), content);
+            //Debug.WriteLine("Status: "+result.StatusCode);
         }
 
-        private void windsensorTriggered(GpioPin sender, GpioPinValueChangedEventArgs e)
+        private void WindsensorTriggered(GpioPin sender, GpioPinValueChangedEventArgs e)
         {
             // toggle the wind sensor rpm counter
             if (e.Edge == GpioPinEdge.FallingEdge)
             {
                 counter++;
             }
+        }
+
+        private async void InitSpi()
+        {
+            //using SPI0 on the Pi
+            var spiSettings = new SpiConnectionSettings(0);//for spi bus index 0
+            spiSettings.ClockFrequency = 3600000; //3.6 MHz
+            spiSettings.Mode = SpiMode.Mode0;
+
+            string spiQuery = SpiDevice.GetDeviceSelector("SPI0");
+            //using Windows.Devices.Enumeration;
+            var deviceInfo = await DeviceInformation.FindAllAsync(spiQuery);
+            if (deviceInfo != null && deviceInfo.Count > 0)
+            {
+                _mcp3008 = await SpiDevice.FromIdAsync(deviceInfo[0].Id, spiSettings);
+				_temperatureAverage = new MovingAverage(10);
+                // read temperature every second
+                temperatureTimer = new Timer(TemperatureTimerCallback, null, 0, 30*1000);
+            }
+            else
+            {
+                TemperatureStatus.Text = "SPI Device Not Found :-(";
+            }
+        }
+
+        private void TemperatureTimerCallback(object state)
+        {
+            //From data sheet -- 1 byte selector for channel 0 on the ADC
+            // First Byte sends the Start bit for SPI
+            // Second Byte is the Configuration Byte
+            //1 - single ended (this is where the 8 below is added)
+            //0 - d2
+            //0 - d1
+            //0 - d0
+            //             S321XXXX <-- single-ended channel selection configure bits
+            // Channel 0 = 10000000 = 0x80 OR (8+channel) << 4
+            // Third Byte is empty
+            var transmitBuffer = new byte[3] { 1, 0x80, 0x00 };
+            var receiveBuffer = new byte[3];
+
+            _mcp3008.TransferFullDuplex(transmitBuffer, receiveBuffer);
+            //first byte returned is 0 (00000000), 
+            //second byte returned we are only interested in the last 2 bits 00000011 ( &3) 
+            //shift 8 bits to make room for the data from the 3rd byte (makes 10 bits total)
+            //third byte, need all bits, simply add it to the above result 
+            var result = ((receiveBuffer[1] & 3) << 8) + receiveBuffer[2];
+            //LM35 == 10mV/1degC ... 3.3V = 3300.0, 10 bit chip # steps is 2 exp 10 == 1024
+            var mv = result * (5000.0 / 1024.0);
+            var tempC = (mv - 500) / 10.0;
+            var tempF = (tempC * 9.0 / 5.0) + 32;
+
+			_temperatureAverage.Add(tempC);
+
+            var output = "The temperature is " + tempC + " Celsius\nand " + tempF + " Farenheit";
+            var task = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                TemperatureStatus.Text = output;
+				AvgTemperatureStatus.Text = "Average temperature is " + _temperatureAverage.Average + " Celsius";
+            });
         }
 
     }
