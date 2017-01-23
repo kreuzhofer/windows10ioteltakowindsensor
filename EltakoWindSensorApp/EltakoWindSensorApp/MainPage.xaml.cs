@@ -22,7 +22,7 @@ namespace EltakoWindSensorApp
         private GpioPin sensorPin;
         private GpioPinValue ledPinValue = GpioPinValue.High;
         private SolidColorBrush redBrush = new SolidColorBrush(Windows.UI.Colors.Red);
-        private SolidColorBrush grayBrush = new SolidColorBrush(Windows.UI.Colors.LightGray);
+        private SolidColorBrush greenBrush = new SolidColorBrush(Windows.UI.Colors.Green);
         private Timer windsensorTimer;
 
         public MainPage()
@@ -40,7 +40,7 @@ namespace EltakoWindSensorApp
             // Show an error if there is no GPIO controller
             if (gpio == null)
             {
-                GpioStatus.Text = "There is no GPIO controller on this device.";
+                WindStatus.Text = "There is no GPIO controller on this device.";
                 return;
             }
 
@@ -63,9 +63,9 @@ namespace EltakoWindSensorApp
 
             // Register for the ValueChanged event so our buttonPin_ValueChanged 
             // function is called when the button is pressed
-            sensorPin.ValueChanged += buttonPin_ValueChanged;
+            sensorPin.ValueChanged += windsensorTriggered;
 
-            GpioStatus.Text = "GPIO pins initialized correctly.";
+            WindStatus.Text = "GPIO pins initialized correctly.";
 
             // calculate windspeed every second
             windsensorTimer = new Timer(windsensorTimerCallback, null, 1000, 1000);
@@ -81,44 +81,20 @@ namespace EltakoWindSensorApp
             {
                 windspeed = 0;
             }
-            Debug.WriteLine("Windspeed: " + windspeed + "km/h");
-
-            //var message = new Message { Name = "Wind", Value = windspeed };
-            //var httpClient = new HttpClient();
-            //httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
-            //var content = new HttpStringContent(JsonConvert.SerializeObject(message));
-            //var result = await httpClient.PostAsync(new Uri("http://192.168.178.85/api/queue/windsensor"), content);
-            //Debug.WriteLine("Status: "+result.StatusCode);
+            Debug.WriteLine("Wind speed " + windspeed + " km/h");
+            var task = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                WindStatus.Text = "Wind speed " + windspeed + " km/h";
+            });
         }
 
-        private void buttonPin_ValueChanged(GpioPin sender, GpioPinValueChangedEventArgs e)
+        private void windsensorTriggered(GpioPin sender, GpioPinValueChangedEventArgs e)
         {
-            // toggle the state of the LED every time the button is pressed
+            // toggle the wind sensor rpm counter
             if (e.Edge == GpioPinEdge.FallingEdge)
             {
-                ledPinValue = GpioPinValue.Low;
                 counter++;
             }
-            else
-            {
-                ledPinValue = GpioPinValue.High;
-            }
-            ledPin.Write(ledPinValue);
-
-            // need to invoke UI updates on the UI thread because this event
-            // handler gets invoked on a separate thread.
-            var task = Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => {
-                if (e.Edge == GpioPinEdge.FallingEdge)
-                {
-                    ledEllipse.Fill = (ledPinValue == GpioPinValue.Low) ?
-                        redBrush : grayBrush;
-                    GpioStatus.Text = "Button Pressed";
-                }
-                else
-                {
-                    GpioStatus.Text = "Button Released";
-                }
-            });
         }
 
     }
