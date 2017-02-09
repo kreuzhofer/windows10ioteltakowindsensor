@@ -102,7 +102,7 @@ namespace EltakoWindSensorApp
 					_windspeed = windspeed;
 					var message = new Message { Key = "Wind", Value = windspeed.ToString("F2") };
 					var httpClient = new HttpClient();
-					//httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
+					httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
 					var content = new HttpStringContent(JsonConvert.SerializeObject(message), Windows.Storage.Streams.UnicodeEncoding.Utf8, "application/json");
 					var result = await httpClient.PostAsync(new Uri("http://192.168.178.85/api/queue/windsensor"), content);
 					Debug.WriteLine("http status wind sensor call: " + result.StatusCode + " " + (int)result.StatusCode);
@@ -138,7 +138,7 @@ namespace EltakoWindSensorApp
                 _mcp3008 = await SpiDevice.FromIdAsync(deviceInfo[0].Id, spiSettings);
 				_temperatureAverage = new MovingAverage(10);
                 // read temperature every second
-                temperatureTimer = new Timer(TemperatureTimerCallback, null, 0, 1000);
+                temperatureTimer = new Timer(TemperatureTimerCallback, null, 0, 60*1000);
             }
             else
             {
@@ -186,9 +186,9 @@ namespace EltakoWindSensorApp
 			{
 				var message = new Message { Key = "Temperature", Value = _temperatureAverage.Average.ToString("F2") };
 				var httpClient = new HttpClient();
-				//httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
+				httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
 				var content = new HttpStringContent(JsonConvert.SerializeObject(message), Windows.Storage.Streams.UnicodeEncoding.Utf8, "application/json");
-				var postresult = await httpClient.PostAsync(new Uri("http://192.168.178.85/api/queue/windsensor"), content);
+				var postresult = await httpClient.PostAsync(new Uri("http://192.168.178.48/api/queue/windsensor"), content);
 				Debug.WriteLine("http status temperature sensor call: " + postresult.StatusCode + " " + (int)postresult.StatusCode);
 			}
 			catch (Exception ex)
