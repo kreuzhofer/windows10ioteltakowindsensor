@@ -16,11 +16,8 @@ namespace EltakoWindSensorApp
 {
     public sealed partial class MainPage : Page
     {
-        private const int LED_PIN = 6;
         private const int BUTTON_PIN = 5;
-        private GpioPin ledPin;
         private GpioPin sensorPin;
-        private GpioPinValue ledPinValue = GpioPinValue.High;
         private SolidColorBrush redBrush = new SolidColorBrush(Windows.UI.Colors.Red);
         private SolidColorBrush greenBrush = new SolidColorBrush(Windows.UI.Colors.Green);
         private Timer windsensorTimer;
@@ -45,12 +42,6 @@ namespace EltakoWindSensorApp
             }
 
             sensorPin = gpio.OpenPin(BUTTON_PIN);
-            ledPin = gpio.OpenPin(LED_PIN);
-
-            // Initialize LED to the OFF state by first writing a HIGH value
-            // We write HIGH because the LED is wired in a active LOW configuration
-            ledPin.Write(GpioPinValue.High);
-            ledPin.SetDriveMode(GpioPinDriveMode.Output);
 
             // Check if input pull-up resistors are supported
             if (sensorPin.IsDriveModeSupported(GpioPinDriveMode.InputPullDown))
