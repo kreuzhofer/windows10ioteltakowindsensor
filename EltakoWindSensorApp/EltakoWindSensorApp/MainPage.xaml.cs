@@ -20,6 +20,7 @@ namespace EltakoWindSensorApp
     {
         private const int LED_PIN = 6;
         private const int BUTTON_PIN = 5;
+		private const string iot_homesecurity_url = "http://192.168.178.48/";
         private GpioPin ledPin;
         private GpioPin sensorPin;
         private GpioPinValue ledPinValue = GpioPinValue.High;
@@ -104,7 +105,7 @@ namespace EltakoWindSensorApp
 					var httpClient = new HttpClient();
 					httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
 					var content = new HttpStringContent(JsonConvert.SerializeObject(message), Windows.Storage.Streams.UnicodeEncoding.Utf8, "application/json");
-					var result = await httpClient.PostAsync(new Uri("http://192.168.178.85/api/queue/windsensor"), content);
+					var result = await httpClient.PostAsync(new Uri(iot_homesecurity_url+ "api/queue/windsensor"), content);
 					Debug.WriteLine("http status wind sensor call: " + result.StatusCode + " " + (int)result.StatusCode);
 				}
 				catch (Exception ex)
@@ -188,7 +189,7 @@ namespace EltakoWindSensorApp
 				var httpClient = new HttpClient();
 				httpClient.DefaultRequestHeaders.Authorization = new Windows.Web.Http.Headers.HttpCredentialsHeaderValue("Basic", Base64.EncodeTo64("user:pass"));
 				var content = new HttpStringContent(JsonConvert.SerializeObject(message), Windows.Storage.Streams.UnicodeEncoding.Utf8, "application/json");
-				var postresult = await httpClient.PostAsync(new Uri("http://192.168.178.48/api/queue/windsensor"), content);
+				var postresult = await httpClient.PostAsync(new Uri(iot_homesecurity_url+"api/queue/windsensor"), content);
 				Debug.WriteLine("http status temperature sensor call: " + postresult.StatusCode + " " + (int)postresult.StatusCode);
 			}
 			catch (Exception ex)
