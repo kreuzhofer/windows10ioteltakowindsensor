@@ -20,7 +20,7 @@ namespace EltakoWindSensorApp
     {
         private const int LED_PIN = 6;
         private const int BUTTON_PIN = 5;
-		private const string iot_homesecurity_url = "http://192.168.178.48/";
+		private const string iot_homesecurity_url = "http://192.168.178.37/";
         private GpioPin ledPin;
         private GpioPin sensorPin;
         private GpioPinValue ledPinValue = GpioPinValue.High;
